@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Heading from "@/components/heading";
 import { MessageSquare } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -11,7 +13,13 @@ import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
+import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
+import axios from "axios";
+
 const Conversation = () => {
+  const router = useRouter();
+  const [messages, setMessages] = useState<ChatCompletionMessageParam[]>([]);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -22,7 +30,26 @@ const Conversation = () => {
   const isLoading = form.formState.isSubmitting;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    console.log(values);
+    try {
+      const userMessage: ChatCompletionMessageParam = {
+        role: "user",
+        content: values.prompt,
+      };
+      const newMessages = [...messages, userMessage];
+
+      const response = await axios.post("/api/conversation", {
+        messages: newMessages,
+      });
+
+      setMessages((current) => [...current, userMessage, response.data]);
+      form.reset();
+
+      console.log(messages);
+    } catch (error: any) {
+      console.log(error);
+    } finally {
+      router.refresh();
+    }
   };
 
   return (
@@ -46,7 +73,8 @@ const Conversation = () => {
                 render={({ field }) => (
                   <FormItem className="col-span-12 lg:col-span-10">
                     <FormControl className="m-0 p-0">
-                      <Input className="border-0 outline-none focus-visible:ring-0 focus-visible:ring-transparent" 
+                      <Input
+                        className="border-0 outline-none focus-visible:ring-0 focus-visible:ring-transparent"
                         disabled={isLoading}
                         placeholder="Ask me anything"
                         {...field}
@@ -55,14 +83,16 @@ const Conversation = () => {
                   </FormItem>
                 )}
               />
-              <Button className="col-span-12 lg:col-span-2">
-                Generate
-              </Button>
+              <Button className="col-span-12 lg:col-span-2">Generate</Button>
             </form>
           </Form>
         </div>
         <div className="space-y-4 mt-4">
-                Messages content
+          <div className="flex flex-col-reverse gap-y-4">
+            {messages.map((message) => {
+              return <div key={message.content}>{message.content}</div>;
+            })}
+          </div>
         </div>
       </div>
     </div>
